@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TLC Academy · Voice</title>
+<style>
+  body{margin:0;padding:18px;background:#0b0f17;color:#f1f5f9;font:15px/1.5 system-ui,Arial,sans-serif}
+  h1{font-size:17px;margin:0 0 12px}
+  select,textarea,button{font:inherit;color:inherit;background:#19233a;border:1px solid #26334f;border-radius:10px;padding:10px 12px}
+  textarea{width:100%;height:210px;margin:12px 0;resize:vertical;box-sizing:border-box}
+  button{cursor:pointer}
+  #mic{width:100%;padding:16px;font-size:17px;background:#3b82f6;border-color:#3b82f6;color:#fff}
+  #mic.rec{background:#ef4444;border-color:#ef4444}
+  #send{width:100%;background:#22c55e;border-color:#22c55e;color:#fff;font-weight:700}
+  #st{color:#94a3b8;font-size:13px;min-height:20px;margin-top:6px}
+</style>
+</head>
+<body>
+<h1>🎤 TLC Academy — Voice note</h1>
+<select id="lang">
+  <option value="ar-EG">العربية (مصر)</option>
+  <option value="en-US">English</option>
+</select>
+<div style="height:12px"></div>
+<button id="mic">Start recording</button>
+<textarea id="t" dir="auto" placeholder="Your words appear here. You can edit them before sending."></textarea>
+<button id="send">Send to CRM</button>
+<div id="st"></div>
+<script>
+(function () {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var mic = document.getElementById('mic'), t = document.getElementById('t'), st = document.getElementById('st'), lang = document.getElementById('lang');
+  var rec = null, on = false, base = '';
+  function say(m) { st.textContent = m; }
+  if (!SR) { say('This browser has no speech recognition. Please open this in Google Chrome.'); mic.disabled = true; }
+
+  function start() {
+    rec = new SR();
+    rec.lang = lang.value; rec.continuous = true; rec.interimResults = true;
+    base = t.value ? t.value.replace(/\s*$/, ' ') : '';
+    rec.onresult = function (e) {
+      var out = '';
+      for (var i = 0; i < e.results.length; i++) out += e.results[i][0].transcript;
+      t.value = base + out;
+    };
+    rec.onerror = function (e) {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { say('Microphone blocked. Click the 🔒 icon in the address bar and allow the microphone.'); on = false; ui(); }
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') say('Error: ' + e.error);
+    };
+    rec.onend = function () { if (on) { base = t.value.replace(/\s*$/, ' '); try { start(); } catch (x) {} } };
+    rec.start();
+  }
+  function ui() { mic.textContent = on ? '■ Stop' : 'Start recording'; mic.className = on ? 'rec' : ''; if (on) say('Listening… speak now'); }
+  mic.onclick = function () {
+    if (on) { on = false; try { rec.stop(); } catch (x) {} ui(); say('Stopped. Edit if needed, then press Send.'); }
+    else { on = true; ui(); try { start(); } catch (x) { say('Could not start: ' + x.message); on = false; ui(); } }
+  };
+  lang.onchange = function () { if (on) { on = false; try { rec.stop(); } catch (x) {} ui(); } };
+  document.getElementById('send').onclick = function () {
+    var text = t.value.trim();
+    if (!text) { say('Nothing to send yet.'); return; }
+    if (!window.opener) { say('Open this window from the CRM mic button.'); return; }
+    window.opener.postMessage({ type: 'TLC_VOICE_TRANSCRIPT', text: text }, '*');
+    say('Sent ✓'); setTimeout(function () { window.close(); }, 500);
+  };
+})();
+</script>
+</body>
+</html>
